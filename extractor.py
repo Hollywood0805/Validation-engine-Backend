@@ -1,31 +1,42 @@
 import re
-from datetime import datetime
-print("Loading extractor.py...")
 
-def extract_patient_data(text):
-    data = {}
-    
-    age_match = re.search(r"(\d+)[- ]year[- ]old", text, re.IGNORECASE)
-    if age_match:
-        data['age'] = int(age_match.group(1))
+def extract_fields_from_text(text: str, rule_definitions: list) -> dict:
+    """
+    Extracts field values from free-text input using patterns defined in rule_definitions.
 
-    if re.search(r"\bfemale\b", text, re.IGNORECASE):
-        data['gender'] = 'female'
-    elif re.search(r"\bmale\b", text, re.IGNORECASE):
-        data['gender'] = 'male'
+    Parameters:
+    - text: Unstructured user input (e.g., patient summary)
+    - rule_definitions: List of rule dicts, each containing:
+        {
+            "field": "age",
+            "pattern": r"age[:\s]*([0-9]{1,3})"
+        }
 
-    height = re.search(r"(\d+)\s?cm", text)
-    weight = re.search(r"(\d+)\s?kg", text)
-    if height: data['height_cm'] = int(height.group(1))
-    if weight: data['weight_kg'] = int(weight.group(1))
+    Returns:
+    - Dictionary of {field_name: extracted_value}
+    """
 
-    consent = re.search(r"consent.*on (\d{4}-\d{2}-\d{2})", text)
-    dob = re.search(r"(?:date of birth|dob)[\s:]+(\d{4}-\d{2}-\d{2})", text, re.IGNORECASE)
-    if consent: data['date_of_consent'] = consent.group(1)
-    if dob: data['dob'] = dob.group(1)
+    extracted = {}
 
-    if 'height_cm' in data and 'weight_kg' in data:
-        height_m = data['height_cm'] / 100
-        data['bmi'] = round(data['weight_kg'] / (height_m ** 2), 2)
+    for rule in rule_definitions:
+        field = rule.get("field")
+        pattern = rule.get("pattern")
 
-    return data
+        if not field or not pattern:
+            continue  # Skip if missing required keys
+
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            raw_val = match.group(1)
+            # Try to auto-type
+            try:
+                if "." in raw_val:
+                    value = float(raw_val)
+                else:
+                    value = int(raw_val)
+            except ValueError:
+                value = raw_val  # fallback to string
+            extracted[field] = value
+
+    return extracted
+
